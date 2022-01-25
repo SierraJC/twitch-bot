@@ -1,3 +1,8 @@
+# Custom
+database
+json
+libs/config.json
+
 # Logs
 logs
 *.log

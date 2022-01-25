@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>TTS</title>
+	<meta name="description" content="[REDACTED] TTS">
+	<meta name="author" content="[REDACTED]">
+	<script src="http://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.min.js"></script>
+	<script>
+		// const params = new URLSearchParams(window.location.search);
+		// var addr = params.get('addr');
+		if (!window.location.host || window.location.host == "")
+			throw new Error('No host, do not run locally');
+
+		var audios = [];
+
+		function processNext() {
+			if (audios.length > 0) {
+				let audio = audios[0];
+				console.log('Playing audio from queue: ', audio);
+				setTimeout(() => playOnReady(audio), 100);
+			}
+		}
+
+		// Due to the stuttering bug in OBS, we wait for readyState 4 to play audio
+		function playOnReady(audio) {
+			if (audio.readyState == 4)
+				audio.play();
+			else
+				setTimeout(() => playOnReady(audio), 100);
+		}
+
+		var socket = io(`ws://${window.location.host}`, {
+			transports: ['websocket'],
+			reconnection: true,
+			reconnectionDelayMax: 10000,
+			query: {
+				token: window.location.pathname.split('/').slice(0, -1).pop()
+			}
+		});
+		socket.on('connect', () => {
+			console.log(`Connected to socket with id ${socket.id}`);
+		});
+		socket.on('disconnect', () => {
+			console.log(`Disconnected from socket with id ${socket.id}`);
+		});
+
+		socket.on('tts', (data) => {
+			console.log('Received WS TTS event: ', data);
+			let index = audios.push(new Audio());
+			let audio = audios[index - 1];
+			audio.onended = () => {
+				audios.shift();
+				processNext();
+			};
+			audio.defaultPlaybackRate = (data.speed || 100) / 100;
+			audio.volume = (data.volume || 100) / 100;
+			audio.src = data.url;
+			audio.load();
+			if (audios.length == 1) processNext();
+		});
+	</script>
+</head>
+
+<body>
+</body>
+
+</html>
